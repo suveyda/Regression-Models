@@ -1,0 +1,168 @@
+---
+title: "Course_Project"
+author: "suveyda"
+date: "February 15, 2017"
+output: html_document
+---
+
+# Course Project
+
+## Regression Models by Johns Hopkins University
+
+### Introduction
+
+This project is performed for a magazine about the automobile industry called "Motor Trend". We will analyze the **Motor Trend Car Road Tests** data from R datasets package. It contains a data set of a collection of cars, and we are interested in exploring the relationship between a set of variables and miles per gallon (MPG). We are particularly interested in the following two questions:
+
+* "Is an automatic or manual transmission better for MPG"
+* "Quantify the MPG difference between automatic and manual transmissions"
+
+```{r, include=FALSE}
+library(datasets)
+library(ggplot2)
+library(gridExtra)
+```
+
+### Data
+
+The data was extracted from the 1974 Motor Trend US magazine, and comprises fuel consumption and 10 aspects of automobile design and performance for 32 automobiles (1973-74 models).
+
+Dataset contains 32 observations on 11 variables:
+
+*	**mpg:**	Miles/(US) gallon
+*	**cyl:**	Number of cylinders
+*	**disp:**	Displacement (cu.in.)
+*	**hp:**	Gross horsepower
+*	**drat:**	Rear axle ratio
+*	**wt:**	Weight (1000 lbs)
+*	**qsec:**	1/4 mile time
+*	**vs:**	V/S
+*	**am:**	Transmission (0 = automatic, 1 = manual)
+*	**gear:**	Number of forward gears
+*	**carb:**	Number of carburetors
+
+So, we first load the mtcars data to R, and take a look at the variables:
+
+```{r}
+data(mtcars)
+mtcars$am <- as.factor(mtcars$am)
+mtcars$cyl <- as.factor(mtcars$cyl)
+mtcars$vs <- as.factor(mtcars$vs)
+mtcars$gear <- as.factor(mtcars$gear)
+mtcars$carb <- as.factor(mtcars$carb)
+str(mtcars)
+```
+
+### Exploratory Data Analyses
+
+At this step, we perform some basic exploratory data analyses:
+
+```{r}
+summary(mtcars)
+```
+
+```{r}
+table(mtcars$am)
+```
+
+According to the above table, we have 19 automatic and 13 manual transmission cars in the dataset. Furthermore, in the below plot you can see the distribution of mpg in the dataset:
+
+```{r MPG.histogram}
+hist(mtcars$mpg, breaks = 15, xlab = "MPG", main = "Distribution of MPG", col = "lightgreen", xlim = c(10,35))
+```
+
+```{r MPG.transmission.boxplot}
+plot <- ggplot(mtcars, aes(x = am, y = mpg)) + geom_boxplot(aes(fill = am)) + labs(x = "TRANSMISSION TYPE", y = "MPG")
+plot
+```
+
+```{r}
+t.test(mpg ~ am, data = mtcars)
+```
+
+In addition, according to the above box plot, automatic transmissions have lower MPG compared to manual transmission cars. Above t-test also confirms this finding since the p-value is below 0.05 and confidence interval is entirely below zero. Therefore, we can conclude that manual transmission  cars have better fuel efficiency than cars with automatic transmissions. In the next section, we will perform regression analysis to see if that is in fact the case.
+
+### Regression Analyses
+
+In this part, we use regression analysis to see the relation between transmission type and MPG. First of all, we use only the transmission type to predict the MPG:
+
+```{r}
+fit.am <- lm(mpg ~ am, data = mtcars)
+summary(fit.am)
+```
+
+As you can see, transmission type is a significant factor in the model and manual transmission causes a 7.245 increase in MPG. However, adjusted R-square is 0.3385 which means that only 33.85% of the variation in MPG is explained by the transmission type. Now let's use all available variables and see if we can predict the change in MPG variable better:
+
+```{r}
+fit.all <- lm(mpg ~ ., data = mtcars)
+summary(fit.all)
+```
+
+When we use all the available variables to create a model, we can explain 77.9% of the variation in MPG. However, rather than using every variable provided in a dataset, sometimes we can predict a variable better with a subset of variables. So, in the next step we try to find the best linear regression model that can predict MPG:
+
+```{r}
+fit.best <- step(fit.all, direction="both", trace=0)
+summary(fit.best)
+```
+
+As you can see, using only four variables (cyl, hp, wt, and am) we can explain 84.01% of the variation in MPG which is more than the previous model where we used all variables.
+
+```{r}
+t <- data.frame("Model" = c("Transmission Type", "All Variables", "Best Model", "Transmission Type", "All Variables", "Best Model"), "R.Squared" = c(summary(fit.am)$r.squared, summary(fit.all)$r.squared, summary(fit.best)$r.squared, summary(fit.am)$adj.r.squared, summary(fit.all)$adj.r.squared, summary(fit.best)$adj.r.squared), "Type" = c("R-squared","R-squared","R-squared","Adjusted.R-squared","Adjusted.R-squared","Adjusted.R-squared"))
+t$Model <- factor(t$Model, levels=c("Transmission Type", "All Variables", "Best Model"))
+
+t1 <- data.frame("Model" = c("Transmission Type", "All Variables", "Best Model"), "Sigma" = c(summary(fit.am)$sigma, summary(fit.all)$sigma, summary(fit.best)$sigma))
+t1$Model <- factor(t1$Model, levels=c("Transmission Type", "All Variables", "Best Model"))
+```
+
+```{r r.squared}
+plot <- ggplot(t, aes(x = Model, y = R.Squared)) +  geom_line(aes(colour = Type, group = Type)) + xlab("Transmission Type") + ylab("R-squared") + ggtitle("Change of R-squared in Different Linear Regression Models") + theme(plot.title = element_text(hjust = 0.5))
+plot
+```
+
+As you can see in the above plot, even though we observe increasing adjusted R-squared as we modify our models, R-squared in the third model is less than the second model. When comparing different models, we use adjusted R-squared measures rather than R-squared because that has been adjusted for the number of predictors in the model.
+
+Furthermore, you can see the change in residual standard error in the below plot. We observe the minimum residual standard error in the third model, so we select the third model as our final model.  
+
+```{r residual.standard.error}
+plot <- ggplot(t1, aes(x = Model, y = Sigma)) +  geom_line(aes(group = 1), col = "red") + xlab("Transmission Type") + ylab("Residual Standard Error") + ggtitle("Change of Residual Standard Error in Different Models") + theme(plot.title = element_text(hjust = 0.5))
+plot
+```
+
+### Final Model Diagnostic Analyses
+
+```{r residual.plots}
+par(mfrow = c(2,2))
+plot(fit.best)
+```
+
+In this part we perform some basic diagnostic analyses:
+
+* According to the Residuals vs. Fitted plot, points are pretty symmetrically distributed, and in general there aren't clear patterns. So we can conclude that points are random (not depending on fitted values) and thus the plot supports the assumption of independence.
+
+* Again the points are randomly distributed in the Scale-Location plot which confirms the constant variance assumption.
+
+* We observe a small curve in the plots which seems to be resulted from the influence of several car types. These car types are called out on the plots such as Chrysler Imperial, Toyota Corolla, and Fiat 128.
+
+* According to the Normal Q-Q plot, the residuals are normally distributed since the points lie closely to the line. 
+
+* In the Residuals vs. Leverage plot all points are within the 0.5 bands, therefore we can conclude that no outliers are present.
+
+### Final Model Interpretation
+
+In our final model, we can see how MPG is effected by changes in cyl, hp, wt, and transmission type.  According to the below estimated coefficients:
+
+* When **cyl = 6** (and other variables are fixed), we observe an **3.03134 decrease** in MPG
+* When **cyl = 8** (and other variables are fixed), we observe an **2.16368 decrease** in MPG
+* One unit **increase in hp** (when other variables are fixed) leads to an **0.03211 decrease** in MPG
+* One unit **increase in wt** (when other variables are fixed) leads to an **2.49683 decrease** in MPG
+* When the transmission is **manual** (and other variables are fixed), we observe an **1.80921 increase** in MPG
+
+```{r}
+summary(fit.best)$coefficients
+```
+
+```{r}
+summary(fit.best)$coefficients[6,1] + c(-1, 1) * qt(.975, df = fit.best$df) * summary(fit.best)$coefficients[6,2]
+```
+
+According to this model, manual transmission increases the MPG by 1.80921. However, it seems that cyl, hp and wt are statistically more significant when determining MPG. We saw that transmission type was statistically significant in the first model when it's effect on MPG was considered alone. However, when we consider the effect that other variables have on MPG, transmission's effect is reduced. According to the final model, we cannot say that manual transmission is better for MPG since the estimated coefficient is between [-1.060934 - 4.679356] interval with 95% confidence and the interval contains zero. Furthermore, p-value of the am1 variable is 0.20646 which is larger than 0.05. So, transmission type is not statistically significant when determining MPG.
